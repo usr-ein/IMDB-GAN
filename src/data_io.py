@@ -1,5 +1,6 @@
 import json
 
+import h5py
 import numpy as np
 from keras.datasets import imdb
 from keras.preprocessing import sequence
@@ -80,3 +81,9 @@ def export_losses(losses, fn="metrics.json", verbose=True):
     # Saves the losses for latter plotting
     with open(fn, "w") as f:
         json.dump(losses, f)
+
+
+def export_preds(preds, fn="preds.h5"):
+    h5f = h5py.File(fn, 'w')
+    h5f.create_dataset('preds', data=preds)
+    h5f.close()
