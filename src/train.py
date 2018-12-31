@@ -1,15 +1,13 @@
-import json
-
-import keras.backend as K
 import numpy as np
-from keras.datasets import imdb
-from keras.layers import Dense
-from keras.layers import Input
-from keras.layers import LSTM
-from keras.layers import RepeatVector
-from keras.models import Model
 from keras.optimizers import Adam
-from keras.preprocessing import sequence
+
+# Data inputs (loading, generating data)
+# and outputs (export models' weights, loss)
+from data_io import export, export_losses
+from data_io import load_data, generate_mixed_data
+# Model building functions
+from models import build_discriminative, build_generative, build_gan
+from models import change_lr, make_trainable
 
 
 def main():
@@ -45,12 +43,7 @@ def main():
     # Stacked GAN
     # In: (None, 100) <-- rnd noise
     # Out: (None, 1) <-- probability of the sentence being real
-    make_trainable(discriminative_model, False)
-    inputs = Input(shape=(noise_size,))
-    x = inputs
-    x = generative_model(x)
-    predictions = discriminative_model(x)
-    gan = Model(inputs=inputs, outputs=predictions)
+    gan = build_gan(noise_size, discriminative_model, generative_model)
     gan.compile(loss='binary_crossentropy', optimizer=generative_optimizer)
     # print(gan.summary())
 
@@ -131,25 +124,6 @@ def main():
         export('quitedInBetween', losses, discriminative_model, generative_model, gan)
 
 
-def export(phase, losses, discriminative_model, generative_model, gan):
-    export_losses(losses, fn="metrics_phase{}.json".format(phase))
-
-    print('Saving the discriminative model')
-    discriminative_model.save('discriminative_model_phase{}.h5'.format(phase))
-    print('Saving the generative model')
-    generative_model.save('generative_model_phase{}.h5'.format(phase))
-    print('Saving the gan model')
-    gan.save('gan_phase{}.h5'.format(phase))
-
-
-def export_losses(losses, fn="metrics.json", verbose=True):
-    if verbose:
-        print('Exporting metrics')
-    # Saves the losses for latter plotting
-    with open(fn, "w") as f:
-        json.dump(losses, f)
-
-
 def train(training_data, nb_epochs, batch_size, discriminative_model, generative_model, gan_model, noise_size,
           vocab_size, losses):
     for epoch in range(nb_epochs):
@@ -177,101 +151,9 @@ def train(training_data, nb_epochs, batch_size, discriminative_model, generative
         losses['g'].append(float(gan_loss))
 
         print('Epoch {}/{}\td_loss {:.3%}\tgan_loss {:.3%}'.format(epoch, nb_epochs, d_loss, gan_loss))
-        export_losses(losses, verbose=False)
+        export_losses(losses, fn='data/metrics.json', verbose=False)
 
     return losses
-
-
-def change_lr(model, val):
-    K.set_value(model.optimizer.lr, val)
-
-
-def make_trainable(net, val):
-    net.trainable = val
-    for l in net.layers:
-        l.trainable = val
-
-
-def build_generative(noise_size, max_len, vocab_size):
-    inputs = Input(shape=(noise_size,))
-    x = inputs
-    x = RepeatVector(max_len)(x)
-    # x = LSTM(vocab_size, return_sequences=True)(x)
-    predictions = LSTM(vocab_size, return_sequences=True)(x)
-
-    generative_model = Model(inputs=inputs, outputs=predictions)
-    return generative_model
-
-
-def build_discriminative(max_len, vocab_size):
-    inputs = Input(shape=(max_len, vocab_size,))
-    x = inputs
-    # DO NOT use embedding as it doesn't support onehot vectors and is just a lookup table in Keras
-    # Instead, use a Dense layer that will project the words into their output space
-    x = Dense(1000)(x)
-    x = LSTM(256, return_sequences=False)(x)
-    predictions = Dense(1, activation='sigmoid')(x)
-
-    discriminative_model = Model(inputs=inputs, outputs=predictions)
-    return discriminative_model
-
-
-def to_one_hot(x, num_classes=None, dtype='int'):
-    # x.shape = (n_samples, max_len) and x[0, :] = [3, 23, 12, 45, .., n] with n <= max_int
-    input_shape = x.shape
-    if input_shape and input_shape[-1] == 1 and len(input_shape) > 1:
-        input_shape = tuple(input_shape[:-1])
-    x = x.ravel()
-    if not num_classes:
-        num_classes = np.max(x) + 1
-    n = x.shape[0]
-    one_hot = np.zeros((n, num_classes), dtype=dtype)
-    one_hot[np.arange(n), x] = 1
-    output_shape = input_shape + (num_classes,)
-    one_hot = np.reshape(one_hot, output_shape)
-    return one_hot
-
-
-def generate_mixed_data(real_data, generative_model, noise_size, vocab_size, real_samples_size=100,
-                        generated_samples_size=100):
-    # Real samples
-    samples_idx = np.random.randint(real_data.shape[0], size=real_samples_size)
-    real_samples = to_one_hot(real_data[samples_idx, :], num_classes=vocab_size)
-    # print('Real samples shape: ', real_samples.shape)
-
-    # Fake samples
-    # print('Generating {} fake samples from noise...'.format(generated_samples_size))
-    noise_gen = np.random.uniform(0, 1, size=[generated_samples_size, noise_size])
-    generated_samples = generative_model.predict(noise_gen)
-    # print('Generated samples shape: ', generated_samples.shape)
-
-    # Total samples
-    input_samples = np.concatenate((real_samples, generated_samples))
-    outputs = np.concatenate((np.ones(real_samples_size), np.ones(generated_samples_size)))
-    # print('Samples shape: ', input_samples.shape)
-    # print('Outputs shape: ', outputs.shape)
-
-    return input_samples, outputs
-
-
-def load_data(vocab_size=2000, max_len=1000, n_samples=128):
-    input_data = lambda: None
-    output_labels = lambda: None
-    (input_data.train, output_labels.train), (input_data.test, output_labels.test) = imdb.load_data(
-        num_words=vocab_size, index_from=0)
-
-    input_data.train = sequence.pad_sequences(input_data.train, maxlen=max_len)
-    input_data.test = sequence.pad_sequences(input_data.test, maxlen=max_len)
-
-    assert n_samples <= 25000  # max: 25000 for IMDB
-
-    input_data.train = input_data.train[:n_samples, ]
-    output_labels.train = output_labels.train[:n_samples, ]
-
-    input_data.test = input_data.test[:n_samples, ]
-    output_labels.test = output_labels.test[:n_samples, ]
-
-    return input_data, output_labels
 
 
 if __name__ == '__main__':
