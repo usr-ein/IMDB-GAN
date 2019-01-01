@@ -151,7 +151,7 @@ def train(training_data, nb_epochs, batch_size, discriminative_model, generative
         losses['g'].append(float(gan_loss))
 
         print('Epoch {}/{}\td_loss {:.3%}\tgan_loss {:.3%}'.format(epoch, nb_epochs, d_loss, gan_loss))
-        export_losses(losses, fn='data/metrics.json', verbose=False)
+        export_losses(losses, fn='data/metrics/metrics.json', verbose=False)
 
     return losses
 

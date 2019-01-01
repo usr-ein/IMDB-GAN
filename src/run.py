@@ -6,6 +6,7 @@ import numpy as np
 from keras.models import load_model
 
 from data_io import export_preds
+from decode_generative_preds import decode_preds
 
 list_model_types = ['discriminative', 'generative']
 
@@ -16,7 +17,7 @@ def ask_model_type() -> str:
     for fn, i in zip(list_model_types, range(len(list_model_types))):
         print('({}) {}'.format(i, fn))
     index = input('Choice (type digit): ')
-    while not index.isdigit() or int(index) < 0 or int(index) >= len(list_files):
+    while not index.isdigit() or int(index) < 0 or int(index) >= len(list_model_types):
         print('Please enter a valid value')
         index = input('Choice (type digit): ')
     index = int(index)
@@ -25,7 +26,7 @@ def ask_model_type() -> str:
 
 
 def ask_filename() -> str:
-    list_files = [fn for fn in os.listdir('data') if ('.h5' in fn or '.h5py' in fn or '.hdf5' in fn)]
+    list_files = [fn for fn in os.listdir('data/models') if ('.h5' in fn or '.h5py' in fn or '.hdf5' in fn)]
     print("Please select weight file to load amongst:")
     for fn, i in zip(list_files, range(len(list_files))):
         print('({}) {}'.format(i, fn))
@@ -35,11 +36,11 @@ def ask_filename() -> str:
         index = input('Choice (type digit): ')
     index = int(index)
 
-    return 'data/' + list_files[index]
+    return 'data/models/' + list_files[index]
 
 
 def ask_input_file() -> Union[str, None]:
-    list_files = [fn for fn in os.listdir('data') if ('.h5' in fn or '.h5py' in fn or '.hdf5' in fn)]
+    list_files = [fn for fn in os.listdir('data/inputs') if ('.h5' in fn or '.h5py' in fn or '.hdf5' in fn)]
     list_files += ['none']
     print("Please select input file to load amongst:")
     for fn, i in zip(list_files, range(len(list_files))):
@@ -53,7 +54,7 @@ def ask_input_file() -> Union[str, None]:
     if list_files[index] == list_files[-1]:
         return None
 
-    return 'data/' + list_files[index]
+    return 'data/inputs/' + list_files[index]
 
 
 def load_inputs(fn: str) -> np.ndarray:
@@ -89,12 +90,21 @@ def main():
         run = lambda _, __: print('Failed to determined action to take for requested type of model')
     inputs_fn = ask_input_file()
     inputs = None
+    pred_fn_suffix = ''
     if inputs_fn is not None:
         inputs = load_inputs(inputs_fn)
+        pred_fn_suffix = '_' + inputs_fn[inputs_fn.rfind('/'):inputs_fn.rfind('.')]
+
     preds = run(model, inputs)
-    fn_preds = 'preds_{}_{}.h5'.format(model_type, inputs_fn[inputs_fn.rfind('/'):inputs_fn.rfind('.')])
+    fn_preds = 'data/preds/preds_{}{}.h5'.format(model_type, pred_fn_suffix)
     export_preds(preds, fn=fn_preds)
     print('Predictions have been exported to {}'.format(fn_preds))
+
+    if model_type == list_model_types[1]:
+        resp = input('Do you wish to decode the generative prediction ? (y/n) ')
+        if 'y' not in resp:
+            return
+        decode_preds(fn_preds)
     return
 
 

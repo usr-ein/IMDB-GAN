@@ -65,17 +65,17 @@ def load_data(vocab_size=2000, max_len=1000, n_samples=128):
 
 
 def export(phase, losses, discriminative_model, generative_model, gan):
-    export_losses(losses, fn="metrics_phase{}.json".format(phase))
+    export_losses(losses, fn="data/metrics/metrics_phase{}.json".format(phase))
 
     print('Saving the discriminative model')
-    discriminative_model.save('discriminative_model_phase{}.h5'.format(phase))
+    discriminative_model.save('data/models/discriminative_model_phase{}.h5'.format(phase))
     print('Saving the generative model')
-    generative_model.save('generative_model_phase{}.h5'.format(phase))
+    generative_model.save('data/models/generative_model_phase{}.h5'.format(phase))
     print('Saving the gan model')
-    gan.save('gan_phase{}.h5'.format(phase))
+    gan.save('data/models/gan_phase{}.h5'.format(phase))
 
 
-def export_losses(losses, fn="metrics.json", verbose=True):
+def export_losses(losses, fn="data/metrics/metrics.json", verbose=True):
     if verbose:
         print('Exporting metrics')
     # Saves the losses for latter plotting
@@ -83,7 +83,7 @@ def export_losses(losses, fn="metrics.json", verbose=True):
         json.dump(losses, f)
 
 
-def export_preds(preds, fn="preds.h5"):
+def export_preds(preds, fn="data/preds/preds.h5"):
     h5f = h5py.File(fn, 'w')
     h5f.create_dataset('preds', data=preds)
     h5f.close()

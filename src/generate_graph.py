@@ -13,7 +13,7 @@ def main(filename=None):
         metrics = load_metrics(filename)
         export(metrics, filename)
 
-        if len(filename) == len([f for f in os.listdir('data') if '.json' in f]):
+        if len(filename) == len([f for f in os.listdir('data/metrics') if '.json' in f]):
             break
         resp = input('Another graph ? (y/n) ')
         if 'y' not in resp:
@@ -40,7 +40,7 @@ def export(metrics, filename):
 
 
 def ask_filename():
-    list_files = [fn for fn in os.listdir('data') if '.json' in fn]
+    list_files = [fn for fn in os.listdir('data/metrics') if '.json' in fn]
     list_files.append('all of them')
     print("Please select metrics file amongst:")
     for fn, i in zip(list_files, range(len(list_files))):
@@ -52,9 +52,9 @@ def ask_filename():
     index = int(index)
 
     if list_files[index] == list_files[-1]:
-        return ['data/' + fn for fn in list_files[:-1]]
+        return ['data/metrics/' + fn for fn in list_files[:-1]]
 
-    return ['data/' + list_files[index]]
+    return ['data/metrics/' + list_files[index]]
 
 
 def graph(discriminative_model_loss, gan_model_loss, save_filename):
